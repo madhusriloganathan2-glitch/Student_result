@@ -1,33 +1,48 @@
 import { useState } from 'react';
 import 'bootstrap/dist/css/bootstrap.min.css';
+import { auth, signInWithEmailAndPassword } from '../firebase';
 
 const LoginPage = ({ onLogin }) => {
-  const [credentials, setCredentials] = useState({ username: '', password: '' });
+  const [credentials, setCredentials] = useState({ email: '', password: '' });
   const [error, setError] = useState('');
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    // Simple validation for demo
-    if (!credentials.username || !credentials.password) {
-      setError('Please enter both username and password');
+    
+    if (!credentials.email || !credentials.password) {
+      setError('Please enter both email and password');
       return;
     }
-    
-    // Mock authentication - in real app, this would be an API call
-    const users = {
-      student: { username: 'student', password: 'student123', role: 'student' },
-      teacher: { username: 'teacher', password: 'teacher123', role: 'teacher' },
-      admin: { username: 'admin', password: 'admin123', role: 'admin' }
-    };
 
-    const user = Object.values(users).find(
-      u => u.username === credentials.username && u.password === credentials.password
-    );
-
-    if (user) {
-      onLogin(user);
-    } else {
-      setError('Invalid credentials. Try student/student123, teacher/teacher123, or admin/admin123');
+    try {
+      const userCredential = await signInWithEmailAndPassword(auth, credentials.email, credentials.password);
+      const user = userCredential.user;
+      
+      // For demo purposes, assign admin role to authenticated users
+      // In production, you would fetch user roles from Firestore or custom claims
+      const userData = {
+        email: user.email,
+        username: user.email.split('@')[0], // Extract username from email
+        role: 'admin', // Default to admin for demo
+        uid: user.uid
+      };
+      
+      onLogin(userData);
+    } catch (error) {
+      console.error('Firebase auth error:', error);
+      switch (error.code) {
+        case 'auth/user-not-found':
+          setError('User not found. Please check your email.');
+          break;
+        case 'auth/wrong-password':
+          setError('Incorrect password. Please try again.');
+          break;
+        case 'auth/invalid-email':
+          setError('Invalid email format.');
+          break;
+        default:
+          setError('Login failed. Please try again.');
+      }
     }
   };
 
@@ -42,16 +57,16 @@ const LoginPage = ({ onLogin }) => {
 
           <form onSubmit={handleSubmit} className="space-y-3">
             <div className="mb-3">
-              <label htmlFor="username" className="form-label">
-                Username
+              <label htmlFor="email" className="form-label">
+                Email
               </label>
               <input
-                id="username"
-                type="text"
-                value={credentials.username}
-                onChange={(e) => setCredentials({ ...credentials, username: e.target.value })}
+                id="email"
+                type="email"
+                value={credentials.email}
+                onChange={(e) => setCredentials({ ...credentials, email: e.target.value })}
                 className="form-control"
-                placeholder="Enter your username"
+                placeholder="Enter your email"
               />
             </div>
 
@@ -84,10 +99,9 @@ const LoginPage = ({ onLogin }) => {
           </form>
 
           <div className="mt-4 text-center text-muted small">
-            <p className="mb-1">Demo Accounts:</p>
-            <p className="mb-1">Student: student/student123</p>
-            <p className="mb-1">Teacher: teacher/teacher123</p>
-            <p className="mb-0">Admin: admin/admin123</p>
+            <p className="mb-1">Firebase Authentication:</p>
+            <p className="mb-1">Use any valid Firebase email/password</p>
+            <p className="mb-0">All authenticated users redirect to admin dashboard</p>
           </div>
         </div>
       </div>
